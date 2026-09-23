@@ -1,0 +1,53 @@
+digraph ETL {
+graph [rankdir=TB,bgcolor="white",nodesep=.3,ranksep=.28];
+node [fontname="Arial",fontsize=11,shape=box,style="rounded,filled",fillcolor="#E8F0F5",color="#234859",margin=".15,.08"];
+edge [fontname="Arial",fontsize=9,color="#52616B"];
+inicio [shape=oval,label="Inicio"];
+conexion [label="Conectar a bigdata
+Abrir transacción"];
+existe [shape=diamond,label="¿Existe operaciones?",fillcolor="#FAF1DF"];
+esquema [label="Crear tablas del script base
+Crear regiones y campos de control"];
+csv [label="Abrir CSV y leer encabezado"];
+fila [shape=diamond,label="¿Quedan filas CSV?",fillcolor="#FAF1DF"];
+leer [label="Leer fila
+Reparar comillas exteriores si hay un solo campo"];
+validar [shape=diamond,label="¿5 campos y región conocida?",fillcolor="#FAF1DF"];
+temporal [label="getCodigoRegion
+cargarTablaTemporal"];
+catalogos [label="Cargar las 6 regiones
+Agrupar temporal por departamento"];
+departamentos [label="cargarDepartamento
+ID = 57 + DANE de 2 dígitos"];
+municipios [label="Ordenar por departamento y municipio
+cargarMunicipio con consecutivo por departamento"];
+ventas [label="Comprobar ID de Támesis
+Cargar 10.000 INSERT originales
+Exportar copia anterior a limpieza"];
+fechas [label="A Normalizar las 10 fechas
+Registrar interpretación y ambigüedad"];
+cantidades [label="C Cantidades negativas → valor absoluto
+B Ceros → promedio municipal positivo redondeado"];
+faltantes [label="D Departamento desde municipios
+E Producto 0 en Támesis → NARANJITA"];
+region [label="Asignar id_region según departamento
+Guardar validacion y causa_modificacion"];
+tipos [label="Fecha → date
+Agregar PK, FK y restricciones"];
+vista [label="Crear vista_operaciones
+Contar tabla, vista y modificaciones"];
+control [shape=diamond,label="¿10.000 = 10.000
+y 30 modificaciones?",fillcolor="#FAF1DF"];
+salida [label="Ejecutar consultas 7.1–7.6 desde la vista
+Exportar resultados y diccionarios"];
+commit [label="COMMIT y cerrar conexión"];
+fin [shape=oval,label="Fin correcto"];
+error [label="Informar error
+ROLLBACK y cerrar conexión",fillcolor="#F6E7E3"];
+inicio->conexion->existe;
+existe->error [label="Sí"];existe->esquema [label="No"];
+esquema->csv->fila;fila->leer [label="Sí"];leer->validar;
+validar->temporal [label="Sí"];validar->error [label="No"];temporal->fila;
+fila->catalogos [label="No"];catalogos->departamentos->municipios->ventas->fechas->cantidades->faltantes->region->tipos->vista->control;
+control->salida [label="Sí"];control->error [label="No"];salida->commit->fin;
+}

@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/e912d6b9700e/etl_assignment/entrega/Unidad_1_ETL/python/algoritmo-etl.py", line 104, in <module>
+    if __name__=='__main__': main()
+                             ^^^^^^
+  File "/workspace/scratch/e912d6b9700e/etl_assignment/entrega/Unidad_1_ETL/python/algoritmo-etl.py", line 47, in main
+    conn=conectar()
+         ^^^^^^^^^^
+  File "/workspace/scratch/e912d6b9700e/etl_assignment/entrega/Unidad_1_ETL/python/conexion.py", line 6, in conectar
+    return psycopg2.connect(host=os.getenv('PGHOST', 'localhost'),
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/e912d6b9700e/etl_assignment/pydeps/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 55432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 55432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+

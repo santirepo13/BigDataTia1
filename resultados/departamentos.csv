@@ -1,0 +1,34 @@
+﻿id_departamento,nombre,abb,codigo_dane,codigo_region,poblacion
+5705,Antioquia,,5,1,0
+5708,Atlantico,,8,4,0
+5711,Bogota D.C.,,11,2,0
+5713,Bolivar,,13,4,0
+5715,Boyaca,,15,2,0
+5717,Caldas,,17,1,0
+5718,Caqueta,,18,3,0
+5719,Cauca,,19,6,0
+5720,Cesar,,20,4,0
+5723,Cordoba,,23,4,0
+5725,Cundinamarca,,25,2,0
+5727,Choco,,27,6,0
+5741,Huila,,41,3,0
+5744,La Guajira,,44,4,0
+5747,Magdalena,,47,4,0
+5750,Meta,,50,5,0
+5752,Nariño,,52,6,0
+5754,Norte de Santander,,54,2,0
+5763,Quindio,,63,1,0
+5766,Risaralda,,66,1,0
+5768,Santander,,68,2,0
+5770,Sucre,,70,4,0
+5773,Tolima,,73,3,0
+5776,Valle del Cauca,,76,6,0
+5781,Arauca,,81,5,0
+5785,Casanare,,85,5,0
+5786,Putumayo,,86,3,0
+5788,"Archipielago de San Andres, Providencia y Santa Catalina",,88,4,0
+5791,Amazonas,,91,3,0
+5794,Guainia,,94,5,0
+5795,Guaviare,,95,5,0
+5797,Vaupes,,97,3,0
+5799,Vichada,,99,5,0

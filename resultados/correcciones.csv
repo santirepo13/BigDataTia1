@@ -1,0 +1,31 @@
+﻿id_registro,validacion,causa_modificacion
+10001,modificado,A: fecha 2024-8-21 -> 2024-08-21. Completar mes con cero.
+10014,modificado,C: cantidad -198 -> 198; retirar signo negativo.
+10225,modificado,B: cantidad 0 -> 136; promedio municipal 136.000000 de 7 registros con cantidad positiva; redondeo a unidad.
+10326,modificado,D: departamento 0 -> 5715; recuperado del municipio Maripi.
+10686,modificado,"E: producto 0 -> 4 NARANJITA; regla del caso para Tamesis, Antioquia."
+11599,modificado,A: fecha 24-02-08 -> 2024-02-08. InterpretaciÃ³n AA-MM-DD y aÃ±o 2024.
+11734,modificado,"E: producto 0 -> 4 NARANJITA; regla del caso para Tamesis, Antioquia."
+11907,modificado,C: cantidad -144 -> 144; retirar signo negativo.
+12110,modificado,A: fecha 024-07-17 -> 2024-07-17. Completar aÃ±o truncado 024 como 2024.
+12188,modificado,D: departamento 0 -> 5715; recuperado del municipio Ventaquemada.
+13161,modificado,B: cantidad 0 -> 105; promedio municipal 104.916667 de 12 registros con cantidad positiva; redondeo a unidad.
+13945,modificado,A: fecha 13-12-2024 -> 2024-12-13. InterpretaciÃ³n DD-MM-AAAA.
+14020,modificado,D: departamento 0 -> 5723; recuperado del municipio San Pelayo.
+14368,modificado,A: fecha 24-28-10 -> 2024-10-28. InterpretaciÃ³n AA-DD-MM y aÃ±o 2024.
+15208,modificado,C: cantidad -175 -> 175; retirar signo negativo.
+15412,modificado,B: cantidad 0 -> 79; promedio municipal 79.200000 de 5 registros con cantidad positiva; redondeo a unidad.
+15955,modificado,A: fecha 24-27-09 -> 2024-09-27. InterpretaciÃ³n AA-DD-MM y aÃ±o 2024.
+16558,modificado,A: fecha 01-02-24 -> 2024-02-01. Supuesto DD-MM-AA; no se puede descartar 2024-01-02 con el dato original.
+16635,modificado,D: departamento 0 -> 5741; recuperado del municipio Neiva.
+17125,modificado,A: fecha 12-12-2024 -> 2024-12-12. InterpretaciÃ³n DD-MM-AAAA.
+17341,modificado,"E: producto 0 -> 4 NARANJITA; regla del caso para Tamesis, Antioquia."
+17528,modificado,B: cantidad 0 -> 79; promedio municipal 79.200000 de 5 registros con cantidad positiva; redondeo a unidad.
+18056,modificado,A: fecha 24-09-09 -> 2024-09-09. InterpretaciÃ³n AA-MM-DD y aÃ±o 2024.
+18126,modificado,C: cantidad -181 -> 181; retirar signo negativo.
+18469,modificado,D: departamento 0 -> 5763; recuperado del municipio Quimbaya.
+18911,modificado,"E: producto 0 -> 4 NARANJITA; regla del caso para Tamesis, Antioquia."
+19181,modificado,B: cantidad 0 -> 107; promedio municipal 107.181818 de 11 registros con cantidad positiva; redondeo a unidad.
+19195,modificado,"E: producto 0 -> 4 NARANJITA; regla del caso para Tamesis, Antioquia."
+19538,modificado,C: cantidad -112 -> 112; retirar signo negativo.
+19680,modificado,A: fecha 11-23-2024 -> 2024-11-23. InterpretaciÃ³n MM-DD-AAAA.

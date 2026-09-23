@@ -1,0 +1,24 @@
+digraph F {graph[rankdir=TB,nodesep=.2,ranksep=.15];node[fontname="Arial",fontsize=12,shape=box,style="rounded,filled",fillcolor="#E8F0F5",margin=".12,.05"];edge[fontname="Arial",fontsize=10];inicio [shape=oval,label="Inicio"];
+conexion [label="Conectar a bigdata
+Abrir transacción"];
+existe [shape=diamond,label="¿Existe operaciones?",fillcolor="#FAF1DF"];
+esquema [label="Crear tablas del script base
+Crear regiones y campos de control"];
+csv [label="Abrir CSV y leer encabezado"];
+fila [shape=diamond,label="¿Quedan filas CSV?",fillcolor="#FAF1DF"];
+leer [label="Leer fila
+Reparar comillas exteriores si hay un solo campo"];
+validar [shape=diamond,label="¿5 campos y región conocida?",fillcolor="#FAF1DF"];
+temporal [label="getCodigoRegion
+cargarTablaTemporal"];
+catalogos [label="Cargar las 6 regiones
+Agrupar temporal por departamento"];
+departamentos [label="cargarDepartamento
+ID = 57 + DANE de 2 dígitos"];
+municipios [label="Ordenar por departamento y municipio
+cargarMunicipio con consecutivo por departamento"];
+ventas [label="Comprobar ID de Támesis
+Cargar 10.000 INSERT originales
+Exportar copia anterior a limpieza"];
+error [label="Informar error
+ROLLBACK y cerrar conexión",fillcolor="#F6E7E3"];inicio->conexion->existe;existe->esquema[label="No"];existe->error[label="Sí"];esquema->csv->fila;fila->leer[label="Sí"];leer->validar;validar->temporal[label="Sí"];validar->error[label="No"];temporal->fila;fila->catalogos[label="No"];catalogos->departamentos->municipios->ventas;ventas->continuar;continuar[shape=oval,label="Continuar en B"];}

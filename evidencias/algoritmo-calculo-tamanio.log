@@ -1,0 +1,4 @@
+{"registros": 10000, "tiempo_ms": 128.457, "tabla_bytes": 712704, "bd_bytes": 11059323, "tabla_kib": 696.0, "bd_mib": 10.546992301940918, "porcentaje": 6.444372770376631}
+{"registros": 100000, "tiempo_ms": 1134.602, "tabla_bytes": 6856704, "bd_bytes": 17203323, "tabla_kib": 6696.0, "bd_mib": 16.406367301940918, "porcentaje": 39.85685788728143}
+{"registros": 1000000, "tiempo_ms": 11592.542, "tabla_bytes": 68313088, "bd_bytes": 78659707, "tabla_kib": 66712.0, "bd_mib": 75.01574230194092, "porcentaje": 86.84635451286387}
+{"registros": 10000000, "tiempo_ms": 119018.03, "tabla_bytes": 682860544, "bd_bytes": 693239931, "tabla_kib": 666856.0, "bd_mib": 661.1251173019409, "porcentaje": 98.50277132982981}
