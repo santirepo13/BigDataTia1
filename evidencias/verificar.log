@@ -1,9 +1,0 @@
-07-1-departamentos-monto.sql coincide con uniones directas; 8 filas
-07-2-antioquia-municipios.sql coincide con uniones directas; 15 filas
-07-3-manzaloca.sql coincide con uniones directas; 5 filas
-07-4-menores-municipios.sql coincide con uniones directas; 5 filas
-07-5-productos-regiones.sql coincide con uniones directas; 24 filas
-07-6-antioquia-productos.sql coincide con uniones directas; 4 filas
-Municipios sin registros de venta (no equivalen a ventas cero): [('Providencia', 'Archipielago de San Andres, Providencia y Santa Catalina'), ('San Andres', 'Archipielago de San Andres, Providencia y Santa Catalina')]
-Última prueba de volumen: (10000000, 1, 10000000, 1, 5000)
-Integridad, ausencia de pérdida y seis comparaciones SQL: CORRECTAS.

@@ -1,5 +1,0 @@
-ENTORNO: ('PostgreSQL 18.3 (PGlite 0.5.8) on wasm32-unknown-emscripten, compiled by emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5), 32-bit', 'bigdata')
-CSV: 1123 filas; comillas reparadas en líneas [917, 950]
-CARGA: 6 regiones, 33 departamentos, 1123 municipios y 10000 operaciones.
-CONTROL: operaciones = 10000; vista = 10000; modificados = 30; válidos sin cambios = 9970.
-ETL CONFIRMADO. Duración total ms: 974.164

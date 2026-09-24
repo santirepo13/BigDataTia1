@@ -53,13 +53,15 @@ CREATE TABLE IF NOT EXISTS public.operaciones(
 );
 
 
--- Productos 
+-- Productos (solo si no existen)
 INSERT INTO productos (id_producto,nombre,precio)
-VALUES
+SELECT id_producto,nombre,precio FROM (VALUES
     (1,'COLOMBIANITA',1200),
     (2,'MANZALOCA',   1000),
     (3,'MANGOSON',     900),
-    (4,'NARANJITA',    600);
+    (4,'NARANJITA',    600)
+) AS v(id_producto,nombre,precio)
+WHERE NOT EXISTS (SELECT 1 FROM productos WHERE id_producto = v.id_producto);
 
 
 -- Esta tabla se utiliza EXCLUSIVAMENTE PARA LOS CÁLCULOS DE TIEMPOS
