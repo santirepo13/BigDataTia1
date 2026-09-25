@@ -1,19 +1,24 @@
-"""Cleans operations with Pandas and displays the results in the console."""
+'''Cleans operations with Pandas and displays the results in the console.'''
 import re
 import unicodedata
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
-from pathlib import Path
 import pandas as pd
 from conexion import connect
+from pathlib import Path
 
 
 ISSUE_TYPES = {
-    'A': ('date', 'Date outside YYYY-MM-DD format or missing'),
-    'B': ('quantity', 'Quantity is zero or missing'),
-    'C': ('quantity', 'Negative quantity'),
-    'D': ('department_id', 'Missing department code'),
-    'E': ('product_id', 'Missing product code'),
+    'A': ('fecha', 'Date outside YYYY-MM-DD format or missing'),
+    'B': ('cantidad', 'Quantity is zero or missing'),
+    'C': ('cantidad', 'Negative quantity'),
+    'D': ('id_departamento', 'Missing department code'),
+    'E': ('id_producto', 'Missing product code'),
+    'F': ('id_registro', 'Duplicate operation identifier'),
+    'G': ('id_municipio', 'Municipality code is missing or unknown'),
+    'H': ('id_region', 'Region code is missing or inconsistent'),
+    'I': ('id_departamento', 'Department code is not an integer'),
+    'J': ('id_producto', 'Product code is not an integer'),
 }
 
 
@@ -32,12 +37,22 @@ def detect_issues(data):
     quantity = pd.to_numeric(data['cantidad'], errors='coerce')
     department = pd.to_numeric(data['id_departamento'], errors='coerce')
     product = pd.to_numeric(data['id_producto'], errors='coerce')
+    operation_id = pd.to_numeric(data['id_registro'], errors='coerce')
+    municipality = pd.to_numeric(data['id_municipio'], errors='coerce')
+    region = pd.to_numeric(data['id_region'], errors='coerce')
+    department_text = data['id_departamento'].astype('string')
+    product_text = data['id_producto'].astype('string')
     return {
         'A': ~data['fecha'].map(is_date_valid),
         'B': quantity.isna() | quantity.eq(0),
         'C': quantity.lt(0),
         'D': department.isna() | department.eq(0),
         'E': product.isna() | product.eq(0),
+        'F': operation_id.duplicated(keep=False),
+        'G': municipality.isna() | municipality.eq(0),
+        'H': region.isna() | region.eq(0),
+        'I': data['id_departamento'].notna() & ~department_text.str.fullmatch(r'\d+'),
+        'J': data['id_producto'].notna() & ~product_text.str.fullmatch(r'\d+'),
     }
 
 
@@ -115,12 +130,16 @@ def clean(operations, municipalities, departments, products, ambiguous_order=Non
             raise ValueError('The catalog contains duplicated codes: ' + key)
     data['validacion'] = 'valido'
     data['causa_modificacion'] = ''
-    issues = detect_issues(data)
+
+    # Use ETL findings if available instead of re-detecting
     findings_file = Path(__file__).resolve().parents[1] / 'resultados' / 'issue_findings.csv'
     if findings_file.is_file():
         findings = pd.read_csv(findings_file, encoding='utf-8-sig').set_index('id_registro')['issue_types']
         issue_labels = data['id_registro'].map(findings).fillna('')
         issues = {issue_type: issue_labels.str.contains(issue_type, regex=False) for issue_type in ISSUE_TYPES}
+    else:
+        issues = detect_issues(data)
+
     audit = []
     years = {int(str(value)[:4]) for value in data.loc[~issues['A'], 'fecha']}
 
@@ -209,8 +228,7 @@ def main():
                     previous_reason = original_data.loc[row.id_registro].get('causa_modificacion', '')
                     previous_reason = '' if pd.isna(previous_reason) else str(previous_reason)
                     reason = previous_reason + (' | ' if previous_reason else '') + row.causa_modificacion
-                    cursor.execute('UPDATE operaciones SET fecha=%s,cantidad=%s,id_departamento=%s,'
-                                   'id_producto=%s,validacion=%s,causa_modificacion=%s WHERE id_registro=%s',
+                    cursor.execute('UPDATE operaciones SET fecha=%s,cantidad=%s,id_departamento=%s,id_producto=%s,validacion=%s,causa_modificacion=%s WHERE id_registro=%s',
                                    (str(row.fecha), int(row.cantidad), int(row.id_departamento), int(row.id_producto),
                                     'modificado', reason, int(row.id_registro)))
                 cursor.execute('UPDATE operaciones o SET id_region=d.codigo_region FROM departamentos d WHERE o.id_departamento=d.id_departamento AND o.id_region IS DISTINCT FROM d.codigo_region')

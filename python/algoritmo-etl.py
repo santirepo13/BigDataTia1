@@ -19,17 +19,16 @@ REGIONS = {
 }
 
 ISSUE_TYPES = {
-    'A': ('date', 'Date not in YYYY-MM-DD format or missing'),
-    'B': ('quantity', 'Quantity is zero or missing'),
-    'C': ('quantity', 'Negative quantity'),
-    'D': ('department_id', 'Missing department code'),
-    'E': ('product_id', 'Missing product code'),
+    'A': ('fecha', 'Date not in YYYY-MM-DD format or missing'),
+    'B': ('cantidad', 'Quantity is zero or missing'),
+    'C': ('cantidad', 'Negative quantity'),
+    'D': ('id_departamento', 'Missing department code'),
+    'E': ('id_producto', 'Missing product code'),
     'F': ('id_registro', 'Duplicate operation identifier'),
     'G': ('id_municipio', 'Municipality code is missing or unknown'),
     'H': ('id_region', 'Region code is missing or inconsistent'),
     'I': ('id_departamento', 'Department code is not an integer'),
     'J': ('id_producto', 'Product code is not an integer'),
-    'K': ('nombre', 'Catalog name is empty'),
 }
 
 
@@ -175,14 +174,8 @@ def main():
 
                 data = pd.DataFrame(records, columns=column_names)
                 summary, affected_count = summarize_issues(data)
-                print('\nISSUE DETECTION (A-E)\n' + summary.to_string(index=False), flush=True)
+                print('\nISSUE DETECTION (A-J)\n' + summary.to_string(index=False), flush=True)
                 print('Distinct records with issues:', affected_count, flush=True)
-                findings = pd.DataFrame({
-                    'id_registro': data['id_registro'],
-                    'issue_types': [';'.join(issue_type for issue_type, mask in detect_issues(data).items() if mask.iloc[index])
-                                    for index in range(len(data))]
-                })
-                findings.to_csv(output_directory / 'issue_findings.csv', index=False, encoding='utf-8-sig')
                 query_results = {}
                 for query_file in sorted((BASE / 'sql').glob('07-*.sql')):
                     cursor.execute(query_file.read_text())
