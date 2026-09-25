@@ -1,0 +1,34 @@
+﻿id_departamento,nombre,abb,codigo_dane,codigo_region,poblacion
+5705,Antioquia,ANT,5,1,10000
+5708,Atlantico,ATL,8,4,10000
+5711,Bogota D.C.,BOG,11,2,10000
+5713,Bolivar,BOL,13,4,10000
+5715,Boyaca,BOY,15,2,10000
+5717,Caldas,CAL,17,1,10000
+5718,Caqueta,CAQ,18,3,10000
+5719,Cauca,CAU,19,6,10000
+5720,Cesar,CES,20,4,10000
+5723,Cordoba,COR,23,4,10000
+5725,Cundinamarca,CUN,25,2,10000
+5727,Choco,CHO,27,6,10000
+5741,Huila,HUI,41,3,10000
+5744,La Guajira,LAG,44,4,10000
+5747,Magdalena,MAG,47,4,10000
+5750,Meta,MET,50,5,10000
+5752,Nariño,NAR,52,6,10000
+5754,Norte de Santander,NOR,54,2,10000
+5763,Quindio,QUI,63,1,10000
+5766,Risaralda,RIS,66,1,10000
+5768,Santander,SAN,68,2,10000
+5770,Sucre,SUC,70,4,10000
+5773,Tolima,TOL,73,3,10000
+5776,Valle del Cauca,VAL,76,6,10000
+5781,Arauca,ARA,81,5,10000
+5785,Casanare,CAS,85,5,10000
+5786,Putumayo,PUT,86,3,10000
+5788,"Archipielago de San Andres, Providencia y Santa Catalina",ARC,88,4,10000
+5791,Amazonas,AMA,91,3,10000
+5794,Guainia,GUA,94,5,10000
+5795,Guaviare,GUA,95,5,10000
+5797,Vaupes,VAU,97,3,10000
+5799,Vichada,VIC,99,5,10000

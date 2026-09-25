@@ -1,0 +1,25 @@
+﻿table,field,problem,count
+departamentos,id_departamento,Duplicate identifier,0
+departamentos,nombre,Missing or empty name,0
+departamentos,nombre,Duplicate name,0
+departamentos,codigo_dane,Missing or empty DANE code,0
+departamentos,codigo_dane,Duplicate DANE code,0
+departamentos,codigo_region,Region outside 1..6 or missing,0
+departamentos,poblacion,Population not informed (zero),0
+departamentos,abb,Abbreviation not informed,0
+municipios,id_municipio,Duplicate identifier,0
+municipios,id_departamento,Unknown department,0
+municipios,nombre,Missing or empty name,0
+municipios,nombre,Duplicate name within department,0
+municipios,codigo_dane,Missing or empty DANE code,0
+municipios,codigo_dane,Duplicate DANE code,0
+municipios,poblacion,Population not informed (zero),0
+municipios,abb,Abbreviation not informed,0
+productos,id_producto,Duplicate identifier,0
+productos,nombre,Missing or empty name,0
+productos,nombre,Duplicate name,0
+productos,precio,"Missing, zero, or negative price",0
+regiones,id_region,Duplicate identifier,0
+regiones,id_region,Region outside 1..6,0
+regiones,nombre,Missing or empty name,0
+regiones,nombre,Duplicate name,0
