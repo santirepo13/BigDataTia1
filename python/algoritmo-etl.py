@@ -29,7 +29,20 @@ ISSUE_TYPES = {
     'H': ('id_region', 'Region code is missing or inconsistent'),
     'I': ('id_departamento', 'Department code is not an integer'),
     'J': ('id_producto', 'Product code is not an integer'),
+    'K': ('id_registro', 'Operation identifier is missing, zero, or negative'),
+    'L': ('id_departamento', 'Department code is not present in the catalog'),
+    'M': ('id_municipio', 'Municipality code is not present in the catalog'),
+    'N': ('id_producto', 'Product code is not present in the catalog'),
+    'O': ('id_region', 'Region code is unknown or inconsistent with the department'),
+    'P': ('id_departamento', 'Municipality does not belong to the informed department'),
+    'Q': ('estado', 'State is missing or invalid'),
+    'R': ('validacion', 'Validation status is missing or invalid'),
+    'S': ('causa_modificacion', 'Modification reason is inconsistent with the validation status'),
+    'T': ('fecha', 'Date has a valid format but is in the future'),
 }
+
+VALID_STATES = {'F'}
+VALID_VALIDATIONS = {'valido', 'modificado', 'pendiente'}
 
 
 def is_date_valid(value):
@@ -43,7 +56,28 @@ def is_date_valid(value):
         return False
 
 
-def detect_issues(data):
+def _catalog_id_set(frame, column):
+    if frame is None or column not in frame.columns or frame.empty:
+        return set()
+    return set(pd.to_numeric(frame[column], errors='coerce').dropna().astype('int64').tolist())
+
+
+def _catalog_map(frame, key, value):
+    if frame is None or key not in frame.columns or value not in frame.columns or frame.empty:
+        return {}
+    keys = pd.to_numeric(frame[key], errors='coerce')
+    values = pd.to_numeric(frame[value], errors='coerce')
+    return {float(k): float(v) for k, v in zip(keys, values) if pd.notna(k) and pd.notna(v)}
+
+
+def _is_future(value, today):
+    try:
+        return date.fromisoformat(str(value)) > today
+    except (ValueError, TypeError):
+        return False
+
+
+def detect_issues(data, departments=None, municipalities=None, products=None, regions=None):
     quantity = pd.to_numeric(data['cantidad'], errors='coerce')
     department = pd.to_numeric(data['id_departamento'], errors='coerce')
     product = pd.to_numeric(data['id_producto'], errors='coerce')
@@ -52,7 +86,13 @@ def detect_issues(data):
     region = pd.to_numeric(data['id_region'], errors='coerce')
     department_text = data['id_departamento'].astype('string')
     product_text = data['id_producto'].astype('string')
-    return {
+    state = data['estado'].astype('string').fillna('')
+    has_status = 'validacion' in data.columns
+    status = data['validacion'].astype('string').fillna('') if has_status else pd.Series('', index=data.index)
+    cause = data['causa_modificacion'].astype('string').fillna('') if 'causa_modificacion' in data.columns else pd.Series('', index=data.index)
+    no_status = pd.Series(False, index=data.index)
+    today = date.today()
+    masks = {
         'A': ~data['fecha'].map(is_date_valid),
         'B': quantity.isna() | quantity.eq(0),
         'C': quantity.lt(0),
@@ -63,11 +103,39 @@ def detect_issues(data):
         'H': region.isna() | region.eq(0),
         'I': data['id_departamento'].notna() & ~department_text.str.fullmatch(r'\d+'),
         'J': data['id_producto'].notna() & ~product_text.str.fullmatch(r'\d+'),
+        'K': operation_id.isna() | operation_id.le(0),
+        'Q': ~state.isin(VALID_STATES),
+        'R': no_status if not has_status else ~status.isin(VALID_VALIDATIONS),
+        'S': no_status if not has_status else (
+            (status.eq('modificado') & cause.str.strip().eq(''))
+            | (status.eq('valido') & cause.str.strip().ne(''))),
+        'T': data['fecha'].map(lambda value: _is_future(value, today)),
     }
+    valid_departments = _catalog_id_set(departments, 'id_departamento')
+    valid_municipalities = _catalog_id_set(municipalities, 'id_municipio')
+    valid_products = _catalog_id_set(products, 'id_producto')
+    valid_regions = _catalog_id_set(regions, 'id_region')
+    if valid_departments:
+        masks['L'] = department.notna() & department.ne(0) & ~department.isin(valid_departments)
+    if valid_municipalities:
+        masks['M'] = municipality.notna() & municipality.ne(0) & ~municipality.isin(valid_municipalities)
+    if valid_products:
+        masks['N'] = product.notna() & product.ne(0) & ~product.isin(valid_products)
+    department_region = _catalog_map(departments, 'id_departamento', 'codigo_region')
+    if department_region:
+        expected_region = department.map(department_region)
+        masks['O'] = region.notna() & expected_region.notna() & region.ne(expected_region)
+        if valid_regions:
+            masks['O'] = masks['O'] | (region.notna() & ~region.isin(valid_regions))
+    municipality_department = _catalog_map(municipalities, 'id_municipio', 'id_departamento')
+    if municipality_department:
+        expected_department = municipality.map(municipality_department)
+        masks['P'] = department.gt(0) & expected_department.notna() & department.ne(expected_department)
+    return masks
 
 
-def summarize_issues(data):
-    masks = detect_issues(data)
+def summarize_issues(data, departments=None, municipalities=None, products=None, regions=None):
+    masks = detect_issues(data, departments, municipalities, products, regions)
     summary = pd.DataFrame([
         {'type': issue_type, 'problem': ISSUE_TYPES[issue_type][1], 'count': int(mask.sum())}
         for issue_type, mask in masks.items()
@@ -76,9 +144,68 @@ def summarize_issues(data):
     return summary, int(affected.sum())
 
 
+def detect_catalog_issues(departments, municipalities, products, regions):
+    findings = []
+
+    def add(table, field, problem, mask):
+        findings.append({'table': table, 'field': field, 'problem': problem, 'count': int(mask.sum())})
+
+    def empty(series):
+        return series.isna() | series.astype('string').str.strip().eq('')
+
+    if departments is not None and not departments.empty:
+        add('departamentos', 'id_departamento', 'Duplicate identifier', departments['id_departamento'].duplicated(keep=False))
+        add('departamentos', 'nombre', 'Missing or empty name', empty(departments['nombre']))
+        add('departamentos', 'nombre', 'Duplicate name', departments['nombre'].duplicated(keep=False))
+        add('departamentos', 'codigo_dane', 'Missing or empty DANE code', empty(departments['codigo_dane']))
+        add('departamentos', 'codigo_dane', 'Duplicate DANE code', departments['codigo_dane'].duplicated(keep=False))
+        add('departamentos', 'codigo_region', 'Region outside 1..6 or missing', ~pd.to_numeric(departments['codigo_region'], errors='coerce').isin([1, 2, 3, 4, 5, 6]))
+        if 'poblacion' in departments.columns:
+            add('departamentos', 'poblacion', 'Population not informed (zero)', pd.to_numeric(departments['poblacion'], errors='coerce').fillna(0).eq(0))
+        if 'abb' in departments.columns:
+            add('departamentos', 'abb', 'Abbreviation not informed', empty(departments['abb']))
+    if municipalities is not None and not municipalities.empty:
+        add('municipios', 'id_municipio', 'Duplicate identifier', municipalities['id_municipio'].duplicated(keep=False))
+        valid_departments = _catalog_id_set(departments, 'id_departamento')
+        if valid_departments:
+            department_of_municipality = pd.to_numeric(municipalities['id_departamento'], errors='coerce')
+            add('municipios', 'id_departamento', 'Unknown department', department_of_municipality.isna() | ~department_of_municipality.isin(valid_departments))
+        add('municipios', 'nombre', 'Missing or empty name', empty(municipalities['nombre']))
+        add('municipios', 'nombre', 'Duplicate name within department', municipalities.duplicated(subset=['id_departamento', 'nombre'], keep=False))
+        add('municipios', 'codigo_dane', 'Missing or empty DANE code', empty(municipalities['codigo_dane']))
+        add('municipios', 'codigo_dane', 'Duplicate DANE code', municipalities['codigo_dane'].duplicated(keep=False))
+        if 'poblacion' in municipalities.columns:
+            add('municipios', 'poblacion', 'Population not informed (zero)', pd.to_numeric(municipalities['poblacion'], errors='coerce').fillna(0).eq(0))
+        if 'abb' in municipalities.columns:
+            add('municipios', 'abb', 'Abbreviation not informed', empty(municipalities['abb']))
+    if products is not None and not products.empty:
+        add('productos', 'id_producto', 'Duplicate identifier', products['id_producto'].duplicated(keep=False))
+        add('productos', 'nombre', 'Missing or empty name', empty(products['nombre']))
+        add('productos', 'nombre', 'Duplicate name', products['nombre'].duplicated(keep=False))
+        if 'precio' in products.columns:
+            unit_price = pd.to_numeric(products['precio'], errors='coerce')
+            add('productos', 'precio', 'Missing, zero, or negative price', unit_price.isna() | unit_price.le(0))
+    if regions is not None and not regions.empty:
+        add('regiones', 'id_region', 'Duplicate identifier', regions['id_region'].duplicated(keep=False))
+        add('regiones', 'id_region', 'Region outside 1..6', ~pd.to_numeric(regions['id_region'], errors='coerce').isin([1, 2, 3, 4, 5, 6]))
+        add('regiones', 'nombre', 'Missing or empty name', empty(regions['nombre']))
+        add('regiones', 'nombre', 'Duplicate name', regions['nombre'].duplicated(keep=False))
+    return pd.DataFrame(findings)
+
+
+def read_table(cursor, table_name):
+    cursor.execute('SELECT * FROM ' + table_name + ' ORDER BY 1')
+    return pd.DataFrame(cursor.fetchall(), columns=[column.name for column in cursor.description])
+
+
 def normalize_name(value):
     return ''.join(character for character in unicodedata.normalize('NFD', str(value))
                    if unicodedata.category(character) != 'Mn').upper().strip()
+
+
+def abbreviation(value):
+    letters = ''.join(character for character in normalize_name(value) if character.isalnum())
+    return letters[:3]
 
 
 def main():
@@ -128,8 +255,8 @@ def main():
                     for row in cursor.fetchall():
                         department_id = int('57' + str(row[0]).zfill(2))
                         cursor.execute(
-                            'INSERT INTO departamentos (id_departamento, nombre, codigo_dane, codigo_region) VALUES (%s,%s,%s,%s)',
-                            (department_id, row[1], row[0], row[2])
+                            'INSERT INTO departamentos (id_departamento, nombre, abb, codigo_dane, codigo_region) VALUES (%s,%s,%s,%s,%s)',
+                            (department_id, row[1], abbreviation(row[1]), row[0], row[2])
                         )
                 cursor.execute('SELECT COUNT(*) FROM municipios')
                 if cursor.fetchone()[0] == 0:
@@ -141,8 +268,8 @@ def main():
                         department_id = int('57' + str(department_code).zfill(2))
                         municipality_id = int(str(department_id) + str(municipality_counter).zfill(3))
                         cursor.execute(
-                            'INSERT INTO municipios (id_departamento, id_municipio, nombre, codigo_dane) VALUES (%s,%s,%s,%s)',
-                            (department_id, municipality_id, municipality_name, municipality_code)
+                            'INSERT INTO municipios (id_departamento, id_municipio, nombre, abb, codigo_dane) VALUES (%s,%s,%s,%s,%s)',
+                            (department_id, municipality_id, municipality_name, abbreviation(municipality_name), municipality_code)
                         )
                 cursor.execute("SELECT id_municipio FROM municipios WHERE nombre='Tamesis' AND id_departamento=5705")
                 assert cursor.fetchone()[0] == 5705108, 'Municipal numbering does not match sales data.'
@@ -173,9 +300,25 @@ def main():
                 print('LOADED: operations =', len(records), flush=True)
 
                 data = pd.DataFrame(records, columns=column_names)
-                summary, affected_count = summarize_issues(data)
-                print('\nISSUE DETECTION (A-J)\n' + summary.to_string(index=False), flush=True)
+                departments = read_table(cursor, 'departamentos')
+                municipalities = read_table(cursor, 'municipios')
+                products = read_table(cursor, 'productos')
+                regions = read_table(cursor, 'regiones')
+                summary, affected_count = summarize_issues(data, departments, municipalities, products, regions)
+                print('\nISSUE DETECTION (A-T)\n' + summary.to_string(index=False), flush=True)
                 print('Distinct records with issues:', affected_count, flush=True)
+                catalog_summary = detect_catalog_issues(departments, municipalities, products, regions)
+                print('\nCATALOG FIELD CHECKS\n' + catalog_summary.to_string(index=False), flush=True)
+                masks = detect_issues(data, departments, municipalities, products, regions)
+                findings = pd.DataFrame({
+                    'id_registro': data['id_registro'],
+                    'issue_types': [';'.join(issue for issue, mask in masks.items() if bool(mask.iloc[index]))
+                                    for index in range(len(data))],
+                })
+                findings.to_csv(output_directory / 'issue_findings.csv', index=False, encoding='utf-8-sig')
+                catalog_summary.to_csv(output_directory / 'catalog_findings.csv', index=False, encoding='utf-8-sig')
+                print('Detection results saved to resultados/issue_findings.csv (' +
+                      str(int(findings['issue_types'].ne('').sum())) + ' records) and catalog_findings.csv', flush=True)
                 query_results = {}
                 for query_file in sorted((BASE / 'sql').glob('07-*.sql')):
                     cursor.execute(query_file.read_text())

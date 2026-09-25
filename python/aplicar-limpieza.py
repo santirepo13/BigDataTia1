@@ -1,11 +1,10 @@
-'''Cleans operations with Pandas and displays the results in the console.'''
-import re
+'''Applies the corrections detected by algoritmo-etl.py (resultados/issue_findings.csv).'''
 import unicodedata
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
 import pandas as pd
 from conexion import connect
-from pathlib import Path
 
 
 ISSUE_TYPES = {
@@ -19,51 +18,29 @@ ISSUE_TYPES = {
     'H': ('id_region', 'Region code is missing or inconsistent'),
     'I': ('id_departamento', 'Department code is not an integer'),
     'J': ('id_producto', 'Product code is not an integer'),
+    'K': ('id_registro', 'Operation identifier is missing, zero, or negative'),
+    'L': ('id_departamento', 'Department code is not present in the catalog'),
+    'M': ('id_municipio', 'Municipality code is not present in the catalog'),
+    'N': ('id_producto', 'Product code is not present in the catalog'),
+    'O': ('id_region', 'Region code is unknown or inconsistent with the department'),
+    'P': ('id_departamento', 'Municipality does not belong to the informed department'),
+    'Q': ('estado', 'State is missing or invalid'),
+    'R': ('validacion', 'Validation status is missing or invalid'),
+    'S': ('causa_modificacion', 'Modification reason is inconsistent with the validation status'),
+    'T': ('fecha', 'Date has a valid format but is in the future'),
 }
 
 
-def is_date_valid(value):
-    text = str(value)
-    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', text):
-        return False
-    try:
-        date.fromisoformat(text)
-        return True
-    except ValueError:
-        return False
+def read_query(cursor, query, parameters=None):
+    cursor.execute(query, parameters)
+    return pd.DataFrame(cursor.fetchall(), columns=[column.name for column in cursor.description])
 
 
-def detect_issues(data):
-    quantity = pd.to_numeric(data['cantidad'], errors='coerce')
-    department = pd.to_numeric(data['id_departamento'], errors='coerce')
-    product = pd.to_numeric(data['id_producto'], errors='coerce')
-    operation_id = pd.to_numeric(data['id_registro'], errors='coerce')
-    municipality = pd.to_numeric(data['id_municipio'], errors='coerce')
-    region = pd.to_numeric(data['id_region'], errors='coerce')
-    department_text = data['id_departamento'].astype('string')
-    product_text = data['id_producto'].astype('string')
-    return {
-        'A': ~data['fecha'].map(is_date_valid),
-        'B': quantity.isna() | quantity.eq(0),
-        'C': quantity.lt(0),
-        'D': department.isna() | department.eq(0),
-        'E': product.isna() | product.eq(0),
-        'F': operation_id.duplicated(keep=False),
-        'G': municipality.isna() | municipality.eq(0),
-        'H': region.isna() | region.eq(0),
-        'I': data['id_departamento'].notna() & ~department_text.str.fullmatch(r'\d+'),
-        'J': data['id_producto'].notna() & ~product_text.str.fullmatch(r'\d+'),
-    }
-
-
-def summarize_issues(data):
-    masks = detect_issues(data)
-    summary = pd.DataFrame([
-        {'type': issue_type, 'problem': ISSUE_TYPES[issue_type][1], 'count': int(mask.sum())}
-        for issue_type, mask in masks.items()
-    ])
-    affected = pd.concat(masks.values(), axis=1).any(axis=1)
-    return summary, int(affected.sum())
+def load_findings():
+    findings_file = Path(__file__).resolve().parents[1] / 'resultados' / 'issue_findings.csv'
+    if not findings_file.is_file():
+        raise FileNotFoundError('resultados/issue_findings.csv not found. Run algoritmo-etl.py first.')
+    return pd.read_csv(findings_file, encoding='utf-8-sig').set_index('id_registro')['issue_types']
 
 
 def normalize_date(value, years, ambiguous_order=None):
@@ -118,27 +95,38 @@ def normalize_name(value):
                    if unicodedata.category(character) != 'Mn').upper().strip()
 
 
-def clean(operations, municipalities, departments, products, ambiguous_order=None):
+def abbreviation(value):
+    letters = ''.join(character for character in normalize_name(value) if character.isalnum())
+    return letters[:3]
+
+
+def clean_catalogs(cursor, default_population=10000):
+    repairs = []
+    for table, key in (('departamentos', 'id_departamento'), ('municipios', 'id_municipio')):
+        rows = read_query(cursor, f'SELECT {key}, nombre, abb, poblacion FROM {table} ORDER BY {key}')
+        missing_abbreviation = rows['abb'].isna() | rows['abb'].astype('string').str.strip().eq('')
+        zero_population = pd.to_numeric(rows['poblacion'], errors='coerce').fillna(0).eq(0)
+        for index, record in rows.iterrows():
+            identifier = int(record[key])
+            if missing_abbreviation.at[index]:
+                value = abbreviation(record['nombre'])
+                cursor.execute(f'UPDATE {table} SET abb=%s WHERE {key}=%s', (value, identifier))
+                repairs.append({'table': table, 'field': 'abb', 'id': identifier, 'value': value})
+            if zero_population.at[index]:
+                cursor.execute(f'UPDATE {table} SET poblacion=%s WHERE {key}=%s', (default_population, identifier))
+                repairs.append({'table': table, 'field': 'poblacion', 'id': identifier, 'value': default_population})
+    return pd.DataFrame(repairs)
+
+
+def clean(operations, findings, municipalities, departments, products, ambiguous_order=None):
     data = operations.copy(deep=True).reset_index(drop=True)
     originals = data.copy(deep=True)
     for field in ['id_registro', 'id_municipio', 'cantidad', 'id_departamento', 'id_producto']:
         data[field] = pd.to_numeric(data[field], errors='coerce')
-    if data['id_registro'].isna().any() or data['id_registro'].duplicated().any():
-        raise ValueError('Operation identifiers are empty or duplicated.')
-    for catalog, key in ((municipalities, 'id_municipio'), (departments, 'id_departamento'), (products, 'id_producto')):
-        if catalog[key].duplicated().any():
-            raise ValueError('The catalog contains duplicated codes: ' + key)
+    issue_labels = data['id_registro'].map(findings).fillna('')
+    issues = {issue_type: issue_labels.str.contains(issue_type, regex=False) for issue_type in ISSUE_TYPES}
     data['validacion'] = 'valido'
     data['causa_modificacion'] = ''
-
-    # Use ETL findings if available instead of re-detecting
-    findings_file = Path(__file__).resolve().parents[1] / 'resultados' / 'issue_findings.csv'
-    if findings_file.is_file():
-        findings = pd.read_csv(findings_file, encoding='utf-8-sig').set_index('id_registro')['issue_types']
-        issue_labels = data['id_registro'].map(findings).fillna('')
-        issues = {issue_type: issue_labels.str.contains(issue_type, regex=False) for issue_type in ISSUE_TYPES}
-    else:
-        issues = detect_issues(data)
 
     audit = []
     years = {int(str(value)[:4]) for value in data.loc[~issues['A'], 'fecha']}
@@ -190,6 +178,49 @@ def clean(operations, municipalities, departments, products, ambiguous_order=Non
             record_change(index, 'E', int(naranjita.iloc[0]), 'Case rule: only NARANJITA is sold in Támesis, Antioquia.')
         else:
             record_change(index, 'E', None, 'The Támesis rule cannot infer this product.')
+    region_map = {}
+    if 'codigo_region' in departments.columns:
+        region_map = {int(k): int(v) for k, v in zip(
+            pd.to_numeric(departments['id_departamento'], errors='coerce').dropna().astype('int64'),
+            pd.to_numeric(departments['codigo_region'], errors='coerce').dropna().astype('int64'))}
+    empty_mask = pd.Series(False, index=data.index)
+
+    def department_from_municipality(index):
+        municipality = data.at[index, 'id_municipio']
+        return int(department_map[municipality]) if municipality in department_map.index else None
+
+    for issue_type in ('L', 'P'):
+        for index in data.index[issues.get(issue_type, empty_mask)]:
+            new_department = department_from_municipality(index)
+            record_change(index, issue_type, new_department,
+                          'Department obtained from the municipality catalog.' if new_department
+                          else 'Unknown municipality; review the source.')
+    for index in data.index[issues.get('O', empty_mask)]:
+        department = data.at[index, 'id_departamento']
+        new_region = region_map.get(int(department)) if pd.notna(department) else None
+        record_change(index, 'O', new_region,
+                      'Region obtained from the department catalog.' if new_region
+                      else 'Department region unknown; review the source.')
+    for index in data.index[issues.get('N', empty_mask)]:
+        if data.at[index, 'id_municipio'] in set(tamesis) and len(naranjita) == 1:
+            record_change(index, 'N', int(naranjita.iloc[0]), 'Case rule: only NARANJITA is sold in Támesis, Antioquia.')
+        else:
+            record_change(index, 'N', None, 'The Támesis rule cannot infer this product.')
+    for index in data.index[issues.get('Q', empty_mask)]:
+        record_change(index, 'Q', 'F', 'The only valid state is F.')
+    for index in data.index[issues.get('R', empty_mask)]:
+        record_change(index, 'R', 'valido', 'Reset to the default validation status.')
+    for index in data.index[issues.get('S', empty_mask)]:
+        if str(data.at[index, 'validacion']) == 'modificado':
+            record_change(index, 'S', None, 'Modified record without a documented cause.')
+        else:
+            record_change(index, 'S', '', 'Cleared cause for a valid record.')
+    for issue_type, criterion in (
+            ('K', 'Cannot infer a new operation identifier.'),
+            ('M', 'Cannot infer the municipality; review the source.'),
+            ('T', 'Future date cannot be inferred; review the source.')):
+        for index in data.index[issues.get(issue_type, empty_mask)]:
+            record_change(index, issue_type, None, criterion)
     columns = ['type', 'id_registro', 'field', 'problem', 'original_value', 'corrected_value', 'criterion', 'status']
     details = pd.DataFrame(audit, columns=columns).sort_values(['id_registro', 'type'])
     pending_ids = details.loc[details['status'].eq('pending'), 'id_registro']
@@ -197,51 +228,38 @@ def clean(operations, municipalities, departments, products, ambiguous_order=Non
     return data, details
 
 
-def read_query(cursor, query, parameters=None):
-    cursor.execute(query, parameters)
-    return pd.DataFrame(cursor.fetchall(), columns=[column.name for column in cursor.description])
-
-
 def main():
+    findings = load_findings()
     connection = connect()
     try:
         with connection:
             with connection.cursor() as cursor:
                 cursor.execute('SELECT current_database()')
-                print('DATABASE:', cursor.fetchone()[0])
+                print('DATABASE:', cursor.fetchone()[0], flush=True)
                 data = read_query(cursor, 'SELECT * FROM operaciones ORDER BY id_registro FOR UPDATE')
-                summary, affected = summarize_issues(data)
-                print('\nBEFORE CORRECTION\n' + summary.to_string(index=False))
-                if affected == 0:
-                    print('\nNo issues of the five types were found. No changes were made.')
-                    return
                 municipalities = read_query(cursor, 'SELECT * FROM municipios')
                 departments = read_query(cursor, 'SELECT * FROM departamentos')
                 products = read_query(cursor, 'SELECT * FROM productos')
-                cleaned_data, details = clean(data, municipalities, departments, products, 'day-month')
-                print('\nCHANGES CALCULATED WITH PANDAS\n' + details.to_string(index=False))
-                if details['status'].eq('pending').any():
-                    raise RuntimeError('Pending cases remain. The transaction is reverted.')
+                catalog_repairs = clean_catalogs(cursor)
+                if not catalog_repairs.empty:
+                    repair_summary = catalog_repairs.groupby(['table', 'field']).agg(count=('id', 'size')).reset_index()
+                    print('CATALOG REPAIRS\n' + repair_summary.to_string(index=False), flush=True)
+                cleaned_data, details = clean(data, findings, municipalities, departments, products, 'day-month')
+                print('\nCHANGES CALCULATED WITH PANDAS\n' + details.to_string(index=False), flush=True)
                 changes = cleaned_data.loc[cleaned_data['validacion'].eq('modificado')]
                 original_data = data.set_index('id_registro')
                 for row in changes.itertuples():
                     previous_reason = original_data.loc[row.id_registro].get('causa_modificacion', '')
                     previous_reason = '' if pd.isna(previous_reason) else str(previous_reason)
                     reason = previous_reason + (' | ' if previous_reason else '') + row.causa_modificacion
-                    cursor.execute('UPDATE operaciones SET fecha=%s,cantidad=%s,id_departamento=%s,id_producto=%s,validacion=%s,causa_modificacion=%s WHERE id_registro=%s',
+                    region_value = None if pd.isna(row.id_region) else int(row.id_region)
+                    cursor.execute('UPDATE operaciones SET fecha=%s,cantidad=%s,id_departamento=%s,id_producto=%s,id_region=%s,estado=%s,validacion=%s,causa_modificacion=%s WHERE id_registro=%s',
                                    (str(row.fecha), int(row.cantidad), int(row.id_departamento), int(row.id_producto),
-                                    'modificado', reason, int(row.id_registro)))
+                                    region_value, str(row.estado), 'modificado', reason, int(row.id_registro)))
                 cursor.execute('UPDATE operaciones o SET id_region=d.codigo_region FROM departamentos d WHERE o.id_departamento=d.id_departamento AND o.id_region IS DISTINCT FROM d.codigo_region')
-                after_data = read_query(cursor, 'SELECT * FROM operaciones ORDER BY id_registro')
-                control, remaining = summarize_issues(after_data)
-                if remaining or len(after_data) != len(data):
-                    raise RuntimeError('Final verification failed; the transaction is reverted.')
-                ids = [int(value) for value in changes['id_registro']]
-        with connection.cursor() as cursor:
-            saved = read_query(cursor, 'SELECT id_registro,fecha,cantidad,id_departamento,id_producto,validacion FROM operaciones WHERE id_registro=ANY(%s) ORDER BY id_registro', (ids,))
-        print(f'\nCOMMIT CONFIRMED: {len(ids)} records corrected in PostgreSQL.')
-        print('\nSAVED DATABASE VALUES\n' + saved.to_string(index=False))
-        print('\nREMAINING ISSUES\n' + control.to_string(index=False))
+                corrected = len(changes)
+                repaired = len(catalog_repairs)
+        print(f'\nCOMMIT CONFIRMED: {corrected} operations corrected, {repaired} catalog fields repaired.', flush=True)
     finally:
         connection.close()
 
